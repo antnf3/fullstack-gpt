@@ -12,3 +12,8 @@ sudo apt install python3-venv
 python -m venv ./env
 source ./env/bin/activate
 pip install -r requirements.txt
+
+
+
+## LCEL
+[LangChain Expression Language(LCEL)](https://python.langchain.com/docs/expression_language/)
