@@ -8,23 +8,20 @@ from langchain.storage import LocalFileStore
 
 st.set_page_config(page_title="DocumentGPT", page_icon="📑")
 
-st.title("DocumentGPT")
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
 
-st.markdown(
-    """
-Use this chatbot to ask questions to an AI about your files!
-"""
-)
-
-file = st.file_uploader(
-    label="Upload a .txt .pdf or .docx file", type=["pdf", "txt", "docx"]
-)
+with st.sidebar:
+    file = st.file_uploader(
+        label="Upload a .txt .pdf or .docx file", type=["pdf", "txt", "docx"]
+    )
 
 
+@st.cache_data(show_spinner="Embedding file...")
 def embed_file(file):
     file_content = file.read()
     file_path = f"./.cache/{file.name}"
-    st.write(file_content, file_path)
+    # st.write(file_content, file_path)
     with open(file_path, "wb") as f:
         f.write(file_content)
         cache_dir = LocalFileStore(f"./.cache/embedings/{file.name}")
@@ -42,7 +39,33 @@ def embed_file(file):
     return retriever
 
 
+def send_message(message, role, save=True):
+    with st.chat_message(role):
+        st.markdown(message)
+    if save:
+        st.session_state["messages"].append({"message": message, "role": role})
+
+
+def paint_history():
+    for message in st.session_state["messages"]:
+        send_message(message["message"], message["role"], False)
+
+
+st.title("DocumentGPT")
+st.markdown(
+    """
+Use this chatbot to ask questions to an AI about your files!
+
+Upload Document file on SideBar
+"""
+)
+
 if file:
     retriever = embed_file(file)
-    s = retriever.invoke("winston")
-    st.write(s)
+    send_message("I'm ready! Ask away!", "ai", False)
+    paint_history()
+    message = st.chat_input("Ask anything about your file...")
+    if message:
+        send_message(message, "human")
+else:
+    st.session_state["messages"] = []
