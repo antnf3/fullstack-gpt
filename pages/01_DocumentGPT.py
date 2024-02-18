@@ -1,3 +1,6 @@
+from typing import Dict, List
+from uuid import UUID
+from langchain.schema.output import ChatGenerationChunk, GenerationChunk, LLMResult
 import streamlit as st
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import CharacterTextSplitter
@@ -7,17 +10,43 @@ from langchain.storage import LocalFileStore
 from langchain.prompts import ChatPromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
+from langchain.callbacks.base import BaseCallbackHandler
 
-llm = ChatOpenAI(temperature=0.1)
 
-st.set_page_config(page_title="DocumentGPT", page_icon="📑")
+class ChatCallbackHandler(BaseCallbackHandler):
+    message = ""
+
+    def on_llm_start(self, *args, **kwargs):
+        self.message_box = st.empty()
+
+    def on_llm_end(self, *args, **kwargs):
+        save_message(self.message, "ai")
+
+    def on_llm_new_token(self, token, *args, **kwargs):
+        self.message += token
+        self.message_box.markdown(self.message)
+
+
+llm = ChatOpenAI(
+    temperature=0.1,
+    streaming=True,
+    callbacks=[
+        ChatCallbackHandler(),
+    ],
+)
+
+st.set_page_config(
+    page_title="DocumentGPT",
+    page_icon="📑",
+)
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
 with st.sidebar:
     file = st.file_uploader(
-        label="Upload a .txt .pdf or .docx file", type=["pdf", "txt", "docx"]
+        label="Upload a .txt .pdf or .docx file",
+        type=["pdf", "txt", "docx"],
     )
 
 
@@ -43,11 +72,15 @@ def embed_file(file):
     return retriever
 
 
+def save_message(message, role):
+    st.session_state["messages"].append({"message": message, "role": role})
+
+
 def send_message(message, role, save=True):
     with st.chat_message(role):
         st.markdown(message)
     if save:
-        st.session_state["messages"].append({"message": message, "role": role})
+        save_message(message, role)
 
 
 def paint_history():
@@ -89,6 +122,7 @@ if file:
     message = st.chat_input("Ask anything about your file...")
     if message:
         if True:
+            # chain 으로 후출
             send_message(message, "human")
             chain = (
                 {
@@ -98,9 +132,10 @@ if file:
                 | prompt
                 | llm
             )
-            response = chain.invoke(message)
-            send_message(response.content, "ai")
+            with st.chat_message("ai"):
+                chain.invoke(message)
         else:
+            # 수동으로 호출
             docs = retriever.invoke(message)
             docs = "\n\n".join(document.page_content for document in docs)
             prompt = prompt.format_messages(context=docs, question=message)
