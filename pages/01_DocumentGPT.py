@@ -7,10 +7,16 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.storage import LocalFileStore
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chat_models import ChatOpenAI
 from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from langchain.callbacks.base import BaseCallbackHandler
+from langchain.memory import ConversationSummaryBufferMemory
+
+st.set_page_config(
+    page_title="DocumentGPT",
+    page_icon="📑",
+)
 
 
 class ChatCallbackHandler(BaseCallbackHandler):
@@ -35,10 +41,23 @@ llm = ChatOpenAI(
     ],
 )
 
-st.set_page_config(
-    page_title="DocumentGPT",
-    page_icon="📑",
-)
+llm_memory = ChatOpenAI(temperature=0.1, streaming=True)
+
+
+@st.cache_resource
+def init_memory(_llm):
+    return ConversationSummaryBufferMemory(
+        llm=_llm, max_token_limit=120, return_messages=True, memory_key="chat_history"
+    )
+
+
+memory = init_memory(llm_memory)
+
+
+def load_memory(_):
+    print(memory.load_memory_variables({})["chat_history"])
+    return memory.load_memory_variables({})["chat_history"]
+
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
@@ -102,6 +121,7 @@ Answer the question using ONLY the following context. If you don't know the answ
 Context:{context}
 """,
         ),
+        MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{question}"),
     ]
 )
@@ -128,12 +148,14 @@ if file:
                 {
                     "context": retriever | RunnableLambda(format_docs),
                     "question": RunnablePassthrough(),
+                    "chat_history": load_memory,
                 }
                 | prompt
                 | llm
             )
             with st.chat_message("ai"):
-                chain.invoke(message)
+                result = chain.invoke(message)
+                memory.save_context({"input": message}, {"output": result.content})
         else:
             # 수동으로 호출
             docs = retriever.invoke(message)
