@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 from langchain.retrievers import WikipediaRetriever
 from langchain.text_splitter import CharacterTextSplitter
@@ -5,9 +6,21 @@ from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.prompts import ChatPromptTemplate
 from langchain.callbacks import StreamingStdOutCallbackHandler
+from langchain.schema import BaseOutputParser
+
 
 st.set_page_config(page_title="QuizGPT", page_icon="❓")
 st.title("QuizGPT")
+
+
+class JsonOuterParser(BaseOutputParser):
+
+    def parse(self, text):
+        text = text.replace("```", "").replace("json", "")
+        return json.loads(text)
+
+
+outer_parser = JsonOuterParser()
 
 
 def format_docs(docs):
@@ -241,9 +254,15 @@ else:
     start = st.button("Generate Quiz")
 
     if start:
-        question_responose = question_chain.invoke(docs)
-        st.write(question_responose.content)
-        formatting_response = formatting_chain.invoke(
-            {"context": question_responose.content}
-        )
-        st.write(formatting_response.content)
+        # 아래 chain 하나로 합칠수 있음.
+        # question_responose = question_chain.invoke(docs)
+        # st.write(question_responose.content)
+        # formatting_response = formatting_chain.invoke(
+        #     {"context": question_responose.content}
+        # )
+        # st.write(formatting_response.content )
+
+        # 하나로 합침.
+        chain = {"context": question_chain} | formatting_chain | outer_parser
+        response = chain.invoke(docs)
+        st.write(response)
