@@ -215,6 +215,19 @@ def split_file(file):
     return docs
 
 
+@st.cache_data(show_spinner="Making quiz...")
+def run_quiz_chain(_docs, topic):
+    chain = {"context": question_chain} | formatting_chain | outer_parser
+    return chain.invoke(_docs)
+
+
+@st.cache_data(show_spinner="Searching Wikipedia...")
+def wiki_search(term):
+    retriever = WikipediaRetriever(top_k_results=1, lang="ko")
+    docs = retriever.get_relevant_documents(topic)
+    return docs
+
+
 with st.sidebar:
     docs = None
     choice = st.selectbox(
@@ -235,9 +248,7 @@ with st.sidebar:
     else:
         topic = st.text_input("Search Wikipedia")
         if topic:
-            retriever = WikipediaRetriever(top_k_results=1, lang="ko")
-            with st.status("Searching Wikipedia..."):
-                docs = retriever.get_relevant_documents(topic)
+            docs = wiki_search(topic)
 
 if not docs:
     st.write(
@@ -263,6 +274,5 @@ else:
         # st.write(formatting_response.content )
 
         # 하나로 합침.
-        chain = {"context": question_chain} | formatting_chain | outer_parser
-        response = chain.invoke(docs)
+        response = run_quiz_chain(docs, topic if topic else file.name)
         st.write(response)
