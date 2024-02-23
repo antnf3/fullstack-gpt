@@ -262,17 +262,31 @@ Get started by uploading a file or searching on wikipedia in the sidebar
     )
 else:
 
-    start = st.button("Generate Quiz")
+    # start = st.button("Generate Quiz")
 
-    if start:
-        # 아래 chain 하나로 합칠수 있음.
-        # question_responose = question_chain.invoke(docs)
-        # st.write(question_responose.content)
-        # formatting_response = formatting_chain.invoke(
-        #     {"context": question_responose.content}
-        # )
-        # st.write(formatting_response.content )
+    # if start:
+    # 아래 chain 하나로 합칠수 있음.
+    # question_responose = question_chain.invoke(docs)
+    # st.write(question_responose.content)
+    # formatting_response = formatting_chain.invoke(
+    #     {"context": question_responose.content}
+    # )
+    # st.write(formatting_response.content )
 
-        # 하나로 합침.
-        response = run_quiz_chain(docs, topic if topic else file.name)
-        st.write(response)
+    # 하나로 합침.
+    response = run_quiz_chain(docs, topic if topic else file.name)
+    st.write(response)
+    with st.form("question_form"):
+        for question in response["questions"]:
+            st.write(question["question"])
+            value = st.radio(
+                "Select an option",
+                [answer["answer"] for answer in question["answers"]],
+                index=None,
+            )
+            if {"answer": value, "correct": True} in question["answers"]:
+                st.success("Correct")
+            elif value is not None:
+                st.error("Wrong")
+            # st.write({"answer": value, "correct": True} in question["answers"])
+        button = st.form_submit_button()
