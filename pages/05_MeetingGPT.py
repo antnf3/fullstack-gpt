@@ -10,10 +10,31 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import StrOutputParser
+from langchain.vectorstores.faiss import FAISS
+from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
+from langchain.storage import LocalFileStore
+from langchain.document_loaders import UnstructuredFileLoader
 
 llm = ChatOpenAI(temperature=0.1)
 
 has_transcript = os.path.exists("./.cache/test2.txt")
+
+splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+    chunk_size=800,
+    chunk_overlap=100,
+)
+
+
+@st.cache_data()
+def embed_file(file_path):
+    cache_dir = LocalFileStore(f"./.cache/embedings/{file.name}")
+    loader = TextLoader(file_path)
+    docs = loader.load_and_split(text_splitter=splitter)
+    embeddings = OpenAIEmbeddings()
+    cached_embeddir = CacheBackedEmbeddings.from_bytes_store(embeddings, cache_dir)
+    vectorstore = FAISS.from_documents(docs, cached_embeddir)
+    retriever = vectorstore.as_retriever()
+    return retriever
 
 
 @st.cache_data()
@@ -110,10 +131,7 @@ if video:
 
         if start:
             loader = TextLoader(transcript_path)
-            splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-                chunk_size=800,
-                chunk_overlap=100,
-            )
+
             docs = loader.load_and_split(text_splitter=splitter)
             first_summary_prompt = ChatPromptTemplate.from_template(
                 """
@@ -150,3 +168,8 @@ if video:
                         }
                     )
             st.write(summary)
+
+    with qa_tab:
+        retriever = embed_file(transcript_path)
+        docs = retriever.invoke("What subject the talking?")
+        st.write(docs)
