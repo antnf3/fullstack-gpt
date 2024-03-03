@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 
 app = FastAPI(
@@ -6,7 +6,7 @@ app = FastAPI(
     description="Get a real quote said by oldman.",
     servers=[
         {
-            "url": "https://birds-operating-revenues-mat.trycloudflare.com",
+            "url": "https://outdoor-shannon-miscellaneous-advances.trycloudflare.com",
         },
     ],
 )
@@ -30,7 +30,8 @@ class Quote(BaseModel):
     response_description="A Quote object that contains the quote said by someone and the date when the quote was said.",
     response_model=Quote,
 )
-def get_quote():
+def get_quote(request: Request):
+    print(request.headers)
     return {
         "quote": "인생은 짧습니다. 먹고싶은것 마음껏 드세요.",
         "year": 1950,
