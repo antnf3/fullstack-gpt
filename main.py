@@ -4,10 +4,18 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="명언제조기",
     description="Get a real quote said by oldman.",
+    servers=[
+        {
+            "url": "https://birds-operating-revenues-mat.trycloudflare.com",
+        },
+    ],
 )
 
 # 서버실행 명령어
 # uvicorn main:app --reload
+
+# cloudflared tunnel 실행
+# cloudflared tunnel --url http://127.0.0.1:8000
 
 
 class Quote(BaseModel):
