@@ -1,2 +1,29 @@
-import tiktoken
-print(tiktoken)
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(
+    title="명언제조기",
+    description="Get a real quote said by oldman.",
+)
+
+# 서버실행 명령어
+# uvicorn main:app --reload
+
+
+class Quote(BaseModel):
+    quote: str = Field(description="The quote that someone said.")
+    year: int = Field(description="The year when Someone said the quote.")
+
+
+@app.get(
+    "/quote",
+    summary="Returns a random quote by someone",
+    description="upon receiving a GET request this endpoint will return a real quiote said by someone",
+    response_description="A Quote object that contains the quote said by someone and the date when the quote was said.",
+    response_model=Quote,
+)
+def get_quote():
+    return {
+        "quote": "인생은 짧습니다. 먹고싶은것 마음껏 드세요.",
+        "year": 1950,
+    }
