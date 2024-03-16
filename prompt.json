@@ -1,5 +1,5 @@
 {
   "_type": "prompt",
-  "template": "What is the captial of {country}",
+  "template": "{country}의 수도는 어디입니까?",
   "input_variables": ["country"]
 }
