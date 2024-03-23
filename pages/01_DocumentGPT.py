@@ -5,15 +5,61 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.storage import LocalFileStore
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema.runnable import RunnablePassthrough, RunnableLambda
+from langchain.callbacks.base import BaseCallbackHandler
+from langchain.memory import ConversationSummaryBufferMemory
 
 st.set_page_config(
     page_title="Document-GPT",
     page_icon="💾",
 )
 
-llm = ChatOpenAI(temperature=0.1)
+
+class ChatCallbackHandler(BaseCallbackHandler):
+    message = ""
+
+    def on_llm_start(self, *args, **kwargs):
+        self.message_box = st.empty()
+        with st.sidebar:
+            st.write("llm started")
+
+    def on_llm_end(self, *args, **kwargs):
+        save_message(self.message, "ai")
+        with st.sidebar:
+            st.write("llm ended.")
+
+    def on_llm_new_token(self, token: str, *args, **kwargs):
+        self.message += token
+        self.message_box.markdown(self.message)
+
+
+llm = ChatOpenAI(
+    temperature=0.1,
+    streaming=True,
+    callbacks=[
+        ChatCallbackHandler(),
+    ],
+)
+
+llm_memory = ChatOpenAI(temperature=0.1)
+
+
+@st.cache_resource
+def init_memory(_llm):
+    return ConversationSummaryBufferMemory(
+        llm=_llm,
+        max_token_limit=160,
+        memory_key="chat_history",
+        return_messages=True,
+    )
+
+
+memory = init_memory(llm_memory)
+
+
+def load_memory(_):
+    return memory.load_memory_variables({})["chat_history"]
 
 
 @st.cache_resource(show_spinner="Embeddings...")
@@ -48,11 +94,15 @@ def embedd_file(file):
         return retriever
 
 
+def save_message(message, role):
+    st.session_state["messages"].append({"message": message, "role": role})
+
+
 def send_message(message, role, save=True):
     with st.chat_message(role):
         st.markdown(message)
     if save:
-        st.session_state["messages"].append({"message": message, "role": role})
+        save_message(message, role)
 
 
 def paint_message():
@@ -74,6 +124,7 @@ prompt = ChatPromptTemplate.from_messages(
     Context: {context}
     """,
         ),
+        MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{question}"),
     ]
 )
@@ -86,7 +137,7 @@ Welcome!
 
 Use this chatbot to ask questions to an AI about your files
 
-Upload your file.
+Upload your file on the sidebar.
 """
 )
 
@@ -107,11 +158,21 @@ if file:
             {
                 "context": retriever | RunnableLambda(format_docs),
                 "question": RunnablePassthrough(),
+                "chat_history": load_memory,
             }
             | prompt
             | llm
         )
-        response = chain.invoke(message)
-        send_message(response.content, "ai")
+
+        with st.chat_message("ai"):
+            response = chain.invoke(message)
+            memory.save_context(
+                {"input": message},
+                {"output": response.content},
+            )
+
 else:
     st.session_state["messages"] = []
+
+
+print(memory.load_memory_variables({})["chat_history"])
